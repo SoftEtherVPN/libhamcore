@@ -8,6 +8,12 @@
 
 #include <zlib.h>
 
+typedef struct COMPRESSED_FILE
+{
+	void *Data;
+	HAMCORE_FILE File;
+} COMPRESSED_FILE;
+
 HAMCORE *HamcoreOpen(const char *path)
 {
 	if (!path)
@@ -18,7 +24,7 @@ HAMCORE *HamcoreOpen(const char *path)
 	HAMCORE *hamcore = malloc(sizeof(HAMCORE));
 	memset(hamcore, 0, sizeof(HAMCORE));
 
-	hamcore->File = FileOpen(path);
+	hamcore->File = FileOpen(path, false);
 	if (!hamcore->File)
 	{
 		free(hamcore);
@@ -188,5 +194,184 @@ bool HamcoreRead(HAMCORE *hamcore, void *dst, const HAMCORE_FILE *hamcore_file)
 	ok = true;
 FINAL:
 	free(buf);
+	return ok;
+}
+
+bool HamcoreBuild(const char *dst_path, const char *base_path, const char **src_paths, const size_t num)
+{
+	if (!dst_path || !src_paths || num == 0)
+	{
+		return false;
+	}
+
+	COMPRESSED_FILE *compressed_files = calloc(num, sizeof(COMPRESSED_FILE));
+
+	void *buffer = NULL;
+	size_t buffer_size = 0;
+
+	for (size_t i = 0; i < num; ++i)
+	{
+		const char *path = src_paths[i];
+		if (!path)
+		{
+			continue;
+		}
+
+		FILE *handle = FileOpen(path, false);
+		if (!handle)
+		{
+			fprintf(stderr, "HamcoreBuild(): Failed to open \"%s\", skipping...\n", path);
+			continue;
+		}
+
+		COMPRESSED_FILE *compressed_file = &compressed_files[i];
+		HAMCORE_FILE *file = &compressed_file->File;
+
+		file->OriginalSize = FileSize(path);
+		void *content = malloc(file->OriginalSize);
+		int ret = FileRead(handle, content, file->OriginalSize);
+		FileClose(handle);
+
+		if (!ret)
+		{
+			fprintf(stderr, "HamcoreBuild(): Failed to read \"%s\", skipping...\n", path);
+			free(content);
+			continue;
+		}
+
+		const size_t wanted_size = CompressionBufferSize(file->OriginalSize);
+		if (buffer_size < wanted_size)
+		{
+			const size_t prev_size = buffer_size;
+			buffer_size = wanted_size;
+			buffer = realloc(buffer, buffer_size);
+			memset(buffer + prev_size, 0, buffer_size - prev_size);
+		}
+
+		file->Size = buffer_size;
+		ret = compress(buffer, (uLongf *)&file->Size, content, (uLong)file->OriginalSize);
+		free(content);
+
+		if (ret != Z_OK)
+		{
+			fprintf(stderr, "HamcoreBuild(): Failed to compress \"%s\" with error %d, skipping...\n", path, ret);
+			file->Size = 0;
+			continue;
+		}
+
+		const char *relative_path = base_path ? PathRelativeToBase(path, base_path) : path;
+		if (!relative_path)
+		{
+			fprintf(stderr, "HamcoreBuild(): Failed to get relative path for \"%s\", skipping...\n", path);
+			file->Size = 0;
+			continue;
+		}
+
+		const size_t path_size = strlen(relative_path) + 1;
+		file->Path = malloc(path_size);
+		memcpy(file->Path, relative_path, path_size);
+
+		compressed_file->Data = malloc(file->Size);
+		memcpy(compressed_file->Data, buffer, file->Size);
+	}
+
+	size_t offset = HAMCORE_HEADER_SIZE;
+	// Number of files
+	offset += sizeof(uint32_t);
+
+	// File table
+	for (size_t i = 0; i < num; ++i)
+	{
+		const HAMCORE_FILE *file = &compressed_files[i].File;
+		if (file->Size == 0)
+		{
+			continue;
+		}
+
+		// Path (length + string)
+		offset += sizeof(uint32_t) + strlen(file->Path);
+		// Original size
+		offset += sizeof(uint32_t);
+		// Size
+		offset += sizeof(uint32_t);
+		// Offset
+		offset += sizeof(uint32_t);
+	}
+
+	for (size_t i = 0; i < num; ++i)
+	{
+		HAMCORE_FILE *file = &compressed_files[i].File;
+		if (file->Size == 0)
+		{
+			continue;
+		}
+
+		file->Offset = offset;
+		offset += file->Size;
+	}
+
+	if (buffer_size < offset)
+	{
+		buffer_size = offset;
+		buffer = realloc(buffer, buffer_size);
+	}
+
+	void *ptr = buffer;
+	WriteAndSeek(&ptr, HAMCORE_HEADER_DATA, HAMCORE_HEADER_SIZE);
+	uint32_t tmp = BigEndian32((uint32_t)num);
+	WriteAndSeek(&ptr, &tmp, sizeof(tmp));
+
+	for (size_t i = 0; i < num; ++i)
+	{
+		const HAMCORE_FILE *file = &compressed_files[i].File;
+		if (file->Size == 0)
+		{
+			continue;
+		}
+
+		const size_t path_length = strlen(file->Path);
+		tmp = BigEndian32((uint32_t)path_length + 1);
+		WriteAndSeek(&ptr, &tmp, sizeof(tmp));
+		WriteAndSeek(&ptr, file->Path, path_length);
+		free(file->Path);
+
+		tmp = BigEndian32((uint32_t)file->OriginalSize);
+		WriteAndSeek(&ptr, &tmp, sizeof(tmp));
+
+		tmp = BigEndian32((uint32_t)file->Size);
+		WriteAndSeek(&ptr, &tmp, sizeof(tmp));
+
+		tmp = BigEndian32((uint32_t)file->Offset);
+		WriteAndSeek(&ptr, &tmp, sizeof(tmp));
+	}
+
+	for (size_t i = 0; i < num; ++i)
+	{
+		COMPRESSED_FILE *compressed_file = &compressed_files[i];
+		WriteAndSeek(&ptr, compressed_file->Data, compressed_file->File.Size);
+		free(compressed_file->Data);
+	}
+
+	free(compressed_files);
+
+	bool ok = false;
+
+	FILE *handle = FileOpen(dst_path, true);
+	if (!handle)
+	{
+		fprintf(stderr, "HamcoreBuild(): Failed to open \"%s\"!\n", dst_path);
+		goto FINAL;
+	}
+
+	if (!FileWrite(handle, buffer, buffer_size))
+	{
+		fprintf(stderr, "HamcoreBuild(): Failed to write \"%s\"!\n", dst_path);
+		goto FINAL;
+	}
+
+	ok = true;
+FINAL:
+	FileClose(handle);
+	free(buffer);
 	return ok;
 }

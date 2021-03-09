@@ -34,4 +34,6 @@ void HamcoreClose(HAMCORE *hamcore);
 const HAMCORE_FILE *HamcoreFind(const HAMCORE *hamcore, const char *path);
 bool HamcoreRead(HAMCORE *hamcore, void *dst, const HAMCORE_FILE *file);
 
+bool HamcoreBuild(const char *dst_path, const char *base_path, const char **src_paths, const size_t num);
+
 #endif

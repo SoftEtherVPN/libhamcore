@@ -14,4 +14,6 @@ size_t CompressionBufferSize(const size_t original_size);
 
 uint32_t Swap32(const uint32_t value);
 
+void WriteAndSeek(void **dst, const void *src, const size_t size);
+
 #endif
