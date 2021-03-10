@@ -51,7 +51,7 @@ bool FileSeek(FILE *file, const size_t offset)
 		return false;
 	}
 
-	return fseek(file, offset, SEEK_SET) == 0;
+	return fseek(file, (long)offset, SEEK_SET) == 0;
 }
 
 size_t FileSize(const char *path)

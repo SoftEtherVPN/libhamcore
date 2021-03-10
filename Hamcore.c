@@ -245,7 +245,7 @@ bool HamcoreBuild(const char *dst_path, const char *base_path, const char **src_
 			const size_t prev_size = buffer_size;
 			buffer_size = wanted_size;
 			buffer = realloc(buffer, buffer_size);
-			memset(buffer + prev_size, 0, buffer_size - prev_size);
+			memset((uint8_t *)buffer + prev_size, 0, buffer_size - prev_size);
 		}
 
 		file->Size = buffer_size;

@@ -21,6 +21,8 @@ void WriteAndSeek(void **dst, const void *src, const size_t size)
 		return;
 	}
 
-	memcpy(*dst, src, size);
-	*dst += size;
+	uint8_t **buf = (uint8_t **)dst;
+
+	memcpy(*buf, src, size);
+	*buf += size;
 }
