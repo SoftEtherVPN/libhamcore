@@ -2,7 +2,7 @@ on: [push, pull_request]
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{matrix.os}}
     strategy:
       fail-fast: false
       matrix:
@@ -14,7 +14,7 @@ jobs:
           key: 'vcpkg-${{matrix.os}}'
           path: 'C:/vcpkg/installed'
 
-    - uses: knicknic/os-specific-run@v1.0.3
+    - uses: knicknic/os-specific-run@v1.0.4
       name: Install dependencies
       with:
         linux: sudo apt-get -y install ninja-build zlib1g-dev
@@ -25,14 +25,17 @@ jobs:
       with:
         submodules: 'recursive'
 
-    # Workaround for https://github.com/KnicKnic/os-specific-run/issues/9
-    - name: Build
-      run: |
-        if [ "$RUNNER_OS" == "Linux" ] || [ "$RUNNER_OS" == "macOS" ]; then
+    - uses: knicknic/os-specific-run@v1.0.4
+      name: Build
+      with:
+        linux: |
           mkdir ${{runner.workspace}}/build && cd ${{runner.workspace}}/build
           cmake -G Ninja ${{github.workspace}}
           cmake --build .
-        elif [ "$RUNNER_OS" == "Windows" ]; then
-          $COMSPEC /c ${GITHUB_WORKSPACE}/.github/workflows/windows_build.bat
-        fi
-      shell: bash
+        macos: |
+          mkdir ${{runner.workspace}}/build && cd ${{runner.workspace}}/build
+          cmake -G Ninja ${{github.workspace}}
+          cmake --build .
+        windows:
+          ${{github.workspace}}/.github/workflows/windows_build.bat
+        windowsShell: cmd
