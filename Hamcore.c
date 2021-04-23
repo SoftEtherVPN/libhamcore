@@ -22,6 +22,10 @@ HAMCORE *HamcoreOpen(const char *path)
 	}
 
 	HAMCORE *hamcore = malloc(sizeof(HAMCORE));
+	if (!hamcore)
+	{
+		return NULL;
+	}
 	memset(hamcore, 0, sizeof(HAMCORE));
 
 	hamcore->File = FileOpen(path, false);
@@ -54,6 +58,10 @@ HAMCORE *HamcoreOpen(const char *path)
 
 	files->Num = BigEndian32(tmp);
 	files->List = malloc(sizeof(HAMCORE_FILE) * files->Num);
+	if (!files->List)
+	{
+		return NULL;
+	}
 	memset(files->List, 0, sizeof(HAMCORE_FILE) * files->Num);
 
 	for (size_t i = 0; i < files->Num; ++i)
