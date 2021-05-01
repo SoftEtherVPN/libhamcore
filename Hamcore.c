@@ -213,6 +213,10 @@ bool HamcoreBuild(const char *dst_path, const char *base_path, const char **src_
 	}
 
 	COMPRESSED_FILE *compressed_files = calloc(num, sizeof(COMPRESSED_FILE));
+	if (!compressed_files)
+	{
+		return false;
+	}
 
 	void *buffer = NULL;
 	size_t buffer_size = 0;
@@ -277,9 +281,23 @@ bool HamcoreBuild(const char *dst_path, const char *base_path, const char **src_
 
 		const size_t path_size = strlen(relative_path) + 1;
 		file->Path = malloc(path_size);
+		if (!file->Path)
+		{
+			free(compressed_files);
+			free(buffer);
+			return false;
+		}
+
 		memcpy(file->Path, relative_path, path_size);
 
 		compressed_file->Data = malloc(file->Size);
+		if (!compressed_file->Data)
+		{
+			free(compressed_files);
+			free(buffer);
+			return false;
+		}
+
 		memcpy(compressed_file->Data, buffer, file->Size);
 	}
 
