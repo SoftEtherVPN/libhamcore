@@ -8,6 +8,8 @@ include(TestBigEndian)
 
 add_library(libhamcore STATIC)
 
+set_property(TARGET libhamcore PROPERTY POSITION_INDEPENDENT_CODE ON)
+
 test_big_endian(BIG_ENDIAN)
 if(BIG_ENDIAN)
   target_compile_definitions(libhamcore PRIVATE "BYTE_ORDER_BIG_ENDIAN")
