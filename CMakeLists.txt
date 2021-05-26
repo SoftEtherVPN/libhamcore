@@ -21,7 +21,7 @@ if(MSVC)
   target_compile_definitions(libhamcore PRIVATE "_CRT_SECURE_NO_WARNINGS")
 endif()
 
-target_include_directories(libhamcore PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(libhamcore PUBLIC "include")
 
 target_sources(libhamcore
   PRIVATE
@@ -31,7 +31,7 @@ target_sources(libhamcore
     Memory.c
     Memory.h
   PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/Hamcore.h
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/Hamcore.h"
 )
 
 find_package(ZLIB REQUIRED)
