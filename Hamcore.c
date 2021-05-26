@@ -28,7 +28,7 @@ HAMCORE *HamcoreOpen(const char *path)
 	}
 	memset(hamcore, 0, sizeof(HAMCORE));
 
-	hamcore->File = FileOpen(path, false);
+	hamcore->File = Ham_FileOpen(path, false);
 	if (!hamcore->File)
 	{
 		free(hamcore);
@@ -38,7 +38,7 @@ HAMCORE *HamcoreOpen(const char *path)
 	bool ok = false;
 
 	uint8_t header[HAMCORE_HEADER_SIZE];
-	if (!FileRead(hamcore->File, header, sizeof(header)))
+	if (!Ham_FileRead(hamcore->File, header, sizeof(header)))
 	{
 		goto FINAL;
 	}
@@ -49,7 +49,7 @@ HAMCORE *HamcoreOpen(const char *path)
 	}
 
 	uint32_t tmp;
-	if (!FileRead(hamcore->File, &tmp, sizeof(tmp)))
+	if (!Ham_FileRead(hamcore->File, &tmp, sizeof(tmp)))
 	{
 		goto FINAL;
 	}
@@ -66,7 +66,7 @@ HAMCORE *HamcoreOpen(const char *path)
 
 	for (size_t i = 0; i < files->Num; ++i)
 	{
-		if (!FileRead(hamcore->File, &tmp, sizeof(tmp)))
+		if (!Ham_FileRead(hamcore->File, &tmp, sizeof(tmp)))
 		{
 			goto FINAL;
 		}
@@ -81,26 +81,26 @@ HAMCORE *HamcoreOpen(const char *path)
 			--tmp;
 		}
 
-		if (!FileRead(hamcore->File, file->Path, tmp))
+		if (!Ham_FileRead(hamcore->File, file->Path, tmp))
 		{
 			goto FINAL;
 		}
 
-		if (!FileRead(hamcore->File, &tmp, sizeof(tmp)))
+		if (!Ham_FileRead(hamcore->File, &tmp, sizeof(tmp)))
 		{
 			goto FINAL;
 		}
 
 		file->OriginalSize = BigEndian32(tmp);
 
-		if (!FileRead(hamcore->File, &tmp, sizeof(tmp)))
+		if (!Ham_FileRead(hamcore->File, &tmp, sizeof(tmp)))
 		{
 			goto FINAL;
 		}
 
 		file->Size = BigEndian32(tmp);
 
-		if (!FileRead(hamcore->File, &tmp, sizeof(tmp)))
+		if (!Ham_FileRead(hamcore->File, &tmp, sizeof(tmp)))
 		{
 			goto FINAL;
 		}
@@ -126,7 +126,7 @@ void HamcoreClose(HAMCORE *hamcore)
 		return;
 	}
 
-	FileClose(hamcore->File);
+	Ham_FileClose(hamcore->File);
 
 	HAMCORE_FILES *files = &hamcore->Files;
 	if (!files->List)
@@ -175,7 +175,7 @@ bool HamcoreRead(HAMCORE *hamcore, void *dst, const HAMCORE_FILE *hamcore_file)
 		return false;
 	}
 
-	if (!FileSeek(hamcore->File, hamcore_file->Offset))
+	if (!Ham_FileSeek(hamcore->File, hamcore_file->Offset))
 	{
 		return false;
 	}
@@ -183,7 +183,7 @@ bool HamcoreRead(HAMCORE *hamcore, void *dst, const HAMCORE_FILE *hamcore_file)
 	bool ok = false;
 
 	void *buf = malloc(hamcore_file->Size);
-	if (!FileRead(hamcore->File, buf, hamcore_file->Size))
+	if (!Ham_FileRead(hamcore->File, buf, hamcore_file->Size))
 	{
 		goto FINAL;
 	}
@@ -229,7 +229,7 @@ bool HamcoreBuild(const char *dst_path, const char *base_path, const char **src_
 			continue;
 		}
 
-		FILE *handle = FileOpen(path, false);
+		FILE *handle = Ham_FileOpen(path, false);
 		if (!handle)
 		{
 			fprintf(stderr, "HamcoreBuild(): Failed to open \"%s\", skipping...\n", path);
@@ -239,10 +239,10 @@ bool HamcoreBuild(const char *dst_path, const char *base_path, const char **src_
 		COMPRESSED_FILE *compressed_file = &compressed_files[i];
 		HAMCORE_FILE *file = &compressed_file->File;
 
-		file->OriginalSize = FileSize(path);
+		file->OriginalSize = Ham_FileSize(path);
 		void *content = malloc(file->OriginalSize);
-		int ret = FileRead(handle, content, file->OriginalSize);
-		FileClose(handle);
+		int ret = Ham_FileRead(handle, content, file->OriginalSize);
+		Ham_FileClose(handle);
 
 		if (!ret)
 		{
@@ -271,7 +271,7 @@ bool HamcoreBuild(const char *dst_path, const char *base_path, const char **src_
 			continue;
 		}
 
-		const char *relative_path = base_path ? PathRelativeToBase(path, base_path) : path;
+		const char *relative_path = base_path ? Ham_PathRelativeToBase(path, base_path) : path;
 		if (!relative_path)
 		{
 			fprintf(stderr, "HamcoreBuild(): Failed to get relative path for \"%s\", skipping...\n", path);
@@ -343,9 +343,9 @@ bool HamcoreBuild(const char *dst_path, const char *base_path, const char **src_
 	}
 
 	void *ptr = buffer;
-	WriteAndSeek(&ptr, HAMCORE_HEADER_DATA, HAMCORE_HEADER_SIZE);
+	Ham_WriteAndSeek(&ptr, HAMCORE_HEADER_DATA, HAMCORE_HEADER_SIZE);
 	uint32_t tmp = BigEndian32((uint32_t)num);
-	WriteAndSeek(&ptr, &tmp, sizeof(tmp));
+	Ham_WriteAndSeek(&ptr, &tmp, sizeof(tmp));
 
 	for (size_t i = 0; i < num; ++i)
 	{
@@ -357,24 +357,24 @@ bool HamcoreBuild(const char *dst_path, const char *base_path, const char **src_
 
 		const size_t path_length = strlen(file->Path);
 		tmp = BigEndian32((uint32_t)path_length + 1);
-		WriteAndSeek(&ptr, &tmp, sizeof(tmp));
-		WriteAndSeek(&ptr, file->Path, path_length);
+		Ham_WriteAndSeek(&ptr, &tmp, sizeof(tmp));
+		Ham_WriteAndSeek(&ptr, file->Path, path_length);
 		free(file->Path);
 
 		tmp = BigEndian32((uint32_t)file->OriginalSize);
-		WriteAndSeek(&ptr, &tmp, sizeof(tmp));
+		Ham_WriteAndSeek(&ptr, &tmp, sizeof(tmp));
 
 		tmp = BigEndian32((uint32_t)file->Size);
-		WriteAndSeek(&ptr, &tmp, sizeof(tmp));
+		Ham_WriteAndSeek(&ptr, &tmp, sizeof(tmp));
 
 		tmp = BigEndian32((uint32_t)file->Offset);
-		WriteAndSeek(&ptr, &tmp, sizeof(tmp));
+		Ham_WriteAndSeek(&ptr, &tmp, sizeof(tmp));
 	}
 
 	for (size_t i = 0; i < num; ++i)
 	{
 		COMPRESSED_FILE *compressed_file = &compressed_files[i];
-		WriteAndSeek(&ptr, compressed_file->Data, compressed_file->File.Size);
+		Ham_WriteAndSeek(&ptr, compressed_file->Data, compressed_file->File.Size);
 		free(compressed_file->Data);
 	}
 
@@ -382,14 +382,14 @@ bool HamcoreBuild(const char *dst_path, const char *base_path, const char **src_
 
 	bool ok = false;
 
-	FILE *handle = FileOpen(dst_path, true);
+	FILE *handle = Ham_FileOpen(dst_path, true);
 	if (!handle)
 	{
 		fprintf(stderr, "HamcoreBuild(): Failed to open \"%s\"!\n", dst_path);
 		goto FINAL;
 	}
 
-	if (!FileWrite(handle, buffer, buffer_size))
+	if (!Ham_FileWrite(handle, buffer, buffer_size))
 	{
 		fprintf(stderr, "HamcoreBuild(): Failed to write \"%s\"!\n", dst_path);
 		goto FINAL;
@@ -397,7 +397,7 @@ bool HamcoreBuild(const char *dst_path, const char *base_path, const char **src_
 
 	ok = true;
 FINAL:
-	FileClose(handle);
+	Ham_FileClose(handle);
 	free(buffer);
 	return ok;
 }

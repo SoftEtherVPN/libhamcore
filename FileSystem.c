@@ -4,7 +4,7 @@
 
 #include <sys/stat.h>
 
-FILE *FileOpen(const char *path, const bool write)
+FILE *Ham_FileOpen(const char *path, const bool write)
 {
 	if (!path)
 	{
@@ -14,7 +14,7 @@ FILE *FileOpen(const char *path, const bool write)
 	return fopen(path, write ? "wb" : "rb");
 }
 
-bool FileClose(FILE *file)
+bool Ham_FileClose(FILE *file)
 {
 	if (!file)
 	{
@@ -24,7 +24,7 @@ bool FileClose(FILE *file)
 	return fclose(file) == 0;
 }
 
-bool FileRead(FILE *file, void *dst, const size_t size)
+bool Ham_FileRead(FILE *file, void *dst, const size_t size)
 {
 	if (!file || !dst || size == 0)
 	{
@@ -34,7 +34,7 @@ bool FileRead(FILE *file, void *dst, const size_t size)
 	return fread(dst, 1, size, file) == size;
 }
 
-bool FileWrite(FILE *file, const void *src, const size_t size)
+bool Ham_FileWrite(FILE *file, const void *src, const size_t size)
 {
 	if (!file || !src || size == 0)
 	{
@@ -44,7 +44,7 @@ bool FileWrite(FILE *file, const void *src, const size_t size)
 	return fwrite(src, 1, size, file) == size;
 }
 
-bool FileSeek(FILE *file, const size_t offset)
+bool Ham_FileSeek(FILE *file, const size_t offset)
 {
 	if (!file)
 	{
@@ -54,7 +54,7 @@ bool FileSeek(FILE *file, const size_t offset)
 	return fseek(file, (long)offset, SEEK_SET) == 0;
 }
 
-size_t FileSize(const char *path)
+size_t Ham_FileSize(const char *path)
 {
 	if (!path)
 	{
@@ -70,7 +70,7 @@ size_t FileSize(const char *path)
 	return st.st_size;
 }
 
-const char *PathRelativeToBase(const char *full, const char *base)
+const char *Ham_PathRelativeToBase(const char *full, const char *base)
 {
 	if (!full || !base)
 	{
