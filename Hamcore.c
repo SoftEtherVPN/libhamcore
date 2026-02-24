@@ -389,7 +389,7 @@ bool HamcoreBuild(const char *dst_path, const char *base_path, const char **src_
 		goto FINAL;
 	}
 
-	if (!Ham_FileWrite(handle, buffer, buffer_size))
+	if (!Ham_FileWrite(handle, buffer, offset))
 	{
 		fprintf(stderr, "HamcoreBuild(): Failed to write \"%s\"!\n", dst_path);
 		goto FINAL;
