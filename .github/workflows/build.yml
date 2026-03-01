@@ -1,7 +1,14 @@
+name: CI
 on: [push, pull_request]
+
+env:
+  TOOLCHAIN_PATH: "C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
+  COMPILER_PATH: "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Tools/Llvm/x64/bin/clang-cl.exe"
+  VCVARS_PATH: "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Auxiliary/Build/vcvars64.bat"
 
 jobs:
   build:
+    name: "Build"
     runs-on: ${{matrix.os}}
     strategy:
       fail-fast: false
@@ -14,28 +21,102 @@ jobs:
           key: 'vcpkg-${{matrix.os}}'
           path: 'C:/vcpkg/installed'
 
+    - uses: actions/checkout@v6
+
     - uses: knicknic/os-specific-run@v1.0.4
       name: Install dependencies
       with:
         linux: sudo apt-get -y install ninja-build zlib1g-dev
-        macos: brew install ninja zlib
+        macos: brew install zlib
         windows: vcpkg install zlib --triplet x64-windows-static-md
 
-    - uses: actions/checkout@v2
-      with:
-        submodules: 'recursive'
-
     - uses: knicknic/os-specific-run@v1.0.4
-      name: Build
+      name: Build libhamcore
       with:
         linux: |
-          mkdir ${{runner.workspace}}/build && cd ${{runner.workspace}}/build
-          cmake -G Ninja ${{github.workspace}}
+          mkdir build && cd build
+          cmake -G Ninja ..
           cmake --build .
         macos: |
-          mkdir ${{runner.workspace}}/build && cd ${{runner.workspace}}/build
-          cmake -G Ninja ${{github.workspace}}
+          mkdir build && cd build
+          cmake -G Ninja ..
           cmake --build .
-        windows:
-          ${{github.workspace}}/.github/workflows/windows_build.bat
+        windows: |
+          mkdir build && cd build
+          call "${{env.VCVARS_PATH}}"
+          cmake -G Ninja -DCMAKE_TOOLCHAIN_FILE="${{env.TOOLCHAIN_PATH}}" -DVCPKG_TARGET_TRIPLET=x64-windows-static-md ..
+          cmake --build .
         windowsShell: cmd
+
+  integration_test:
+    name: "Integration Test"
+    needs: build
+    runs-on: ${{matrix.os}}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+    - uses: actions/cache@v4
+      if: runner.os == 'Windows'
+      with:
+          key: 'vcpkg-${{matrix.os}}'
+          path: 'build/vcpkg_installed/'
+
+    - uses: actions/checkout@v6
+      name: Fetch SoftEtherVPN
+      with:
+        repository: SoftEtherVPN/SoftEtherVPN
+        submodules: 'recursive'
+
+    - uses: actions/checkout@v6
+      name: Replace upstream libhamcore
+      with:
+        path: src/libhamcore
+
+    - uses: knicknic/os-specific-run@v1.0.4
+      name: Install SoftEtherVPN dependencies
+      with:
+        linux: |
+          sudo apt-get -y install cmake gcc g++ ninja-build libncurses5-dev libreadline-dev libsodium-dev libssl-dev make zlib1g-dev liblz4-dev libnl-genl-3-dev
+          sudo apt-get -y install autoconf libtool liblzo2-dev libpam-dev fping unzip libcap-ng-dev # To build OpenVPN
+
+    - uses: knicknic/os-specific-run@v1.0.4
+      name: Build SoftEtherVPN
+      with:
+        linux: |
+          mkdir build && cd build
+          cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
+          cmake --build .
+        macos: |
+          ./configure
+          make -C build
+        windows: |
+          mkdir build && cd build
+          call "${{env.VCVARS_PATH}}"
+          cmake -G "Ninja" -DCMAKE_TOOLCHAIN_FILE="${{env.TOOLCHAIN_PATH}}" -DVCPKG_TARGET_TRIPLET=x64-windows-static -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER="${{env.COMPILER_PATH}}" -DCMAKE_CXX_COMPILER="${{env.COMPILER_PATH}}" ..
+          cmake --build .
+        windowsShell: cmd
+
+    - uses: knicknic/os-specific-run@v1.0.4
+      name: Run SoftEtherVPN tests
+      with:
+        linux: |
+          sudo .ci/start-se-openvpn.sh
+          sudo .ci/run-openvpn-tests.sh
+        macos: |
+          otool -L build/vpnserver
+          .ci/memory-leak-test.sh
+        windows: |
+          . .ci/appveyor-vpntest.ps1
+
+    - name: Rename hamcore.se2
+      run: mv build/hamcore.se2 hamcore-${{matrix.os}}.se2
+
+    - uses: actions/upload-artifact@v7
+      name: Upload hamcore.se2
+      with:
+        if-no-files-found: error
+        archive: false
+        path: |
+          hamcore-${{matrix.os}}.se2
