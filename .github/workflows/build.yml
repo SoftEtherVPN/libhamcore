@@ -7,8 +7,8 @@ env:
   VCVARS_PATH: "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Auxiliary/Build/vcvars64.bat"
 
 jobs:
-  build:
-    name: "Build"
+  build_and_test:
+    name: "Build and Test"
     runs-on: ${{matrix.os}}
     strategy:
       fail-fast: false
@@ -35,22 +35,32 @@ jobs:
       with:
         linux: |
           mkdir build && cd build
-          cmake -G Ninja ..
+          cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON -DCMAKE_C_FLAGS="-fsanitize=address,leak,undefined -fno-omit-frame-pointer" ..
           cmake --build .
         macos: |
           mkdir build && cd build
-          cmake -G Ninja ..
+          cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" ..
           cmake --build .
         windows: |
           mkdir build && cd build
           call "${{env.VCVARS_PATH}}"
-          cmake -G Ninja -DCMAKE_TOOLCHAIN_FILE="${{env.TOOLCHAIN_PATH}}" -DVCPKG_TARGET_TRIPLET=x64-windows-static-md ..
+          cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON -DCMAKE_TOOLCHAIN_FILE="${{env.TOOLCHAIN_PATH}}" -DVCPKG_TARGET_TRIPLET=x64-windows-static-md -DCMAKE_C_FLAGS="/fsanitize=address" ..
           cmake --build .
+        windowsShell: cmd
+
+    - uses: knicknic/os-specific-run@v1.0.4
+      name: Run CTest
+      with:
+        linux: ctest -j --output-on-failure --test-dir build
+        macos: ctest -j --output-on-failure --test-dir build
+        windows: |
+          call "${{env.VCVARS_PATH}}"
+          ctest -j --output-on-failure --test-dir build
         windowsShell: cmd
 
   integration_test:
     name: "Integration Test"
-    needs: build
+    needs: build_and_test
     runs-on: ${{matrix.os}}
     strategy:
       fail-fast: false
@@ -120,3 +130,4 @@ jobs:
         archive: false
         path: |
           hamcore-${{matrix.os}}.se2
+        retention-days: 30

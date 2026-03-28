@@ -36,3 +36,9 @@ target_sources(libhamcore
 
 find_package(ZLIB REQUIRED)
 target_link_libraries(libhamcore PRIVATE ZLIB::ZLIB)
+
+option(BUILD_TESTING "Enable testing" OFF)
+if (BUILD_TESTING)
+  enable_testing()
+  add_subdirectory(tests)
+endif()
